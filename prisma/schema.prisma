@@ -1,7 +1,4 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
+// Learn more: https://pris.ly/d/prisma-schema
 
 generator client {
   provider = "prisma-client"
@@ -10,4 +7,91 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+}
+
+// --- Auth.js (Google OAuth) — matches @auth/prisma-adapter expectations ---
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+
+  accounts      Account[]
+  sessions      Session[]
+
+  transactions  Transaction[]
+  monthOpenings MonthOpening[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// --- Ledger (single primary bank account per user; no Account row for now) ---
+
+/// Opening balance for a calendar month (the value at the top of each “month tab”).
+model MonthOpening {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// First day of the month (date-only; e.g. 2026-03-01).
+  month           DateTime @db.Date
+  openingBalance  Decimal  @db.Decimal(19, 2)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, month])
+  @@index([userId, month])
+}
+
+/// One line in the running ledger: date, payee, signed amount.
+model Transaction {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  occurredOn DateTime @db.Date
+  payee      String
+  /// Positive = inflow, negative = outflow (matches your sheet).
+  amount     Decimal  @db.Decimal(19, 2)
+  /// Order within the same calendar day (lower = earlier in the list).
+  sortOrder  Int      @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, occurredOn, sortOrder])
 }

@@ -62,6 +62,12 @@ model VerificationToken {
 
 // --- Ledger (single primary bank account per user; no Account row for now) ---
 
+enum TransactionStatus {
+  NONE
+  COMPLETED
+  ESTIMATED
+}
+
 /// Opening balance for a calendar month (the value at the top of each “month tab”).
 model MonthOpening {
   id              String   @id @default(cuid())
@@ -87,6 +93,7 @@ model Transaction {
   payee      String
   /// Positive = inflow, negative = outflow (matches your sheet).
   amount     Decimal  @db.Decimal(19, 2)
+  status     TransactionStatus @default(NONE)
   /// Order within the same calendar day (lower = earlier in the list).
   sortOrder  Int      @default(0)
 

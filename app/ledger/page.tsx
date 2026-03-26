@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
-import { createTransaction, deleteTransaction, setMonthOpening } from "@/app/actions/ledger";
+import { createTransaction, setMonthOpening } from "@/app/actions/ledger";
+import { PayeeAutocompleteInput } from "@/app/ledger/PayeeAutocompleteInput";
+import { TransactionRowMenu } from "@/app/ledger/TransactionRowMenu";
 import {
   dateInputBoundsForMonth,
   defaultDateInputValueForMonth,
@@ -43,17 +45,21 @@ export default async function LedgerPage({
   const txDateDefault = defaultDateInputValueForMonth(year, month);
   const txDateBounds = dateInputBoundsForMonth(year, month);
 
-  const monthLabel = new Date(Date.UTC(year, month - 1, 1)).toLocaleString("en-US", {
-    month: "long",
-    year: "numeric",
-    timeZone: "UTC",
-  });
-
+  const monthLabel = new Date(Date.UTC(year, month - 1, 1)).toLocaleString(
+    "en-US",
+    {
+      month: "long",
+      year: "numeric",
+      timeZone: "UTC",
+    },
+  );
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-col gap-8 px-4 py-10">
       <header className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">Ledger</h1>
+          <h1 className="text-2xl font-semibold tracking-tight text-zinc-900">
+            Ledger
+          </h1>
           <p className="text-sm text-zinc-500">{monthLabel}</p>
         </div>
         <div className="flex items-center gap-3">
@@ -69,17 +75,19 @@ export default async function LedgerPage({
           >
             Next →
           </Link>
-          <a
+          <Link
             className="rounded-lg px-3 py-1.5 text-sm text-zinc-600 hover:bg-zinc-100"
             href="/api/auth/signout"
           >
             Sign out
-          </a>
+          </Link>
         </div>
       </header>
 
       <section className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
-        <h2 className="mb-3 text-sm font-medium text-zinc-700">Month opening balance</h2>
+        <h2 className="mb-3 text-sm font-medium text-zinc-700">
+          Month opening balance
+        </h2>
         <form
           action={setMonthOpening}
           className="flex flex-wrap items-end gap-3"
@@ -107,14 +115,17 @@ export default async function LedgerPage({
         </form>
         {!state.hasStoredOpening ? (
           <p className="mt-2 text-sm text-amber-800">
-            No saved opening for this month yet—the field defaults to last month&apos;s closing
-            balance. Adjust if needed, then save to store it for this month.
+            No saved opening for this month yet—the field defaults to last
+            month&apos;s closing balance. Adjust if needed, then save to store
+            it for this month.
           </p>
         ) : null}
       </section>
 
       <section className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
-        <h2 className="mb-3 text-sm font-medium text-zinc-700">Add transaction</h2>
+        <h2 className="mb-3 text-sm font-medium text-zinc-700">
+          Add transaction
+        </h2>
         <form
           action={createTransaction}
           className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"
@@ -124,12 +135,11 @@ export default async function LedgerPage({
           <input type="hidden" name="month" value={month} />
           <label className="flex flex-col gap-1 text-sm sm:col-span-2">
             <span className="text-zinc-700">Payee</span>
-            <input
-              className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400"
+            <PayeeAutocompleteInput
               name="payee"
-              type="text"
               placeholder="Rent, Paycheck, …"
               required
+              suggestions={state.payeeSuggestions}
             />
           </label>
           <label className="flex flex-col gap-1 text-sm">
@@ -172,28 +182,60 @@ export default async function LedgerPage({
                 <th className="px-4 py-3 font-medium">Date</th>
                 <th className="px-4 py-3 font-medium">Payee</th>
                 <th className="px-4 py-3 text-right font-medium">Amount</th>
-                <th className="px-4 py-3 text-right font-medium">Balance after</th>
+                <th className="px-4 py-3 text-right font-medium">
+                  Balance after
+                </th>
                 <th className="w-24 px-4 py-3" />
               </tr>
             </thead>
             <tbody>
               {state.transactions.length === 0 ? (
                 <tr>
-                  <td className="px-4 py-8 text-center text-zinc-500" colSpan={5}>
+                  <td
+                    className="px-4 py-8 text-center text-zinc-500"
+                    colSpan={5}
+                  >
                     No transactions this month yet.
                   </td>
                 </tr>
               ) : (
                 state.transactions.map((row) => {
                   const amt = Number(row.amount);
-                  const d = row.occurredOn.toISOString().slice(0, 10);
+                  const dDisplay = row.occurredOn.toLocaleDateString("en-US", {
+                    month: "2-digit",
+                    day: "2-digit",
+                    year: "numeric",
+                    timeZone: "UTC",
+                  });
+                  const dIso = row.occurredOn.toISOString().slice(0, 10);
+                  const isCompleted = row.status === "COMPLETED";
+                  const isEstimated = row.status === "ESTIMATED";
                   return (
-                    <tr className="border-b border-zinc-100 hover:bg-zinc-50/80" key={row.id}>
-                      <td className="px-4 py-2 font-mono text-zinc-700">{d}</td>
-                      <td className="px-4 py-2 text-zinc-900">{row.payee}</td>
+                    <tr
+                      className={`border-b border-zinc-100 ${
+                        isCompleted
+                          ? "bg-sky-50 hover:bg-sky-100/40"
+                          : "hover:bg-zinc-50/80"
+                      }`}
+                      key={row.id}
+                    >
+                      <td
+                        className={`px-4 py-2 font-mono text-zinc-700 ${isEstimated ? "italic" : ""}`}
+                      >
+                        {dDisplay}
+                      </td>
+                      <td
+                        className={`px-4 py-2 text-zinc-900 ${isEstimated ? "italic" : ""}`}
+                      >
+                        {row.payee}
+                      </td>
                       <td
                         className={`px-4 py-2 text-right font-mono tabular-nums ${
-                          amt > 0 ? "text-emerald-700" : amt < 0 ? "text-red-600" : "text-zinc-800"
+                          amt > 0
+                            ? "text-emerald-700"
+                            : amt < 0
+                              ? "text-red-600"
+                              : "text-zinc-800"
                         }`}
                       >
                         {money.format(amt)}
@@ -202,15 +244,17 @@ export default async function LedgerPage({
                         {money.format(Number(row.balanceAfter))}
                       </td>
                       <td className="px-4 py-2 text-right">
-                        <form action={deleteTransaction}>
-                          <input name="id" type="hidden" value={row.id} />
-                          <button
-                            className="text-xs text-red-600 hover:underline"
-                            type="submit"
-                          >
-                            Delete
-                          </button>
-                        </form>
+                        <TransactionRowMenu
+                          amount={row.amount}
+                          dateMax={txDateBounds.max}
+                          dateMin={txDateBounds.min}
+                          id={row.id}
+                          month={month}
+                          occurredOnIso={dIso}
+                          payee={row.payee}
+                          status={row.status}
+                          year={year}
+                        />
                       </td>
                     </tr>
                   );

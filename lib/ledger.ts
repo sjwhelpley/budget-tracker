@@ -108,6 +108,7 @@ export type LedgerRow = {
   occurredOn: Date;
   payee: string;
   amount: string;
+  status: "NONE" | "COMPLETED" | "ESTIMATED";
   sortOrder: number;
   balanceAfter: string;
 };
@@ -122,6 +123,7 @@ export async function getLedgerState(
   hasStoredOpening: boolean;
   closing: string;
   transactions: LedgerRow[];
+  payeeSuggestions: string[];
 }> {
   const start = monthStartUtc(year, month);
   const end = monthEndExclusiveUtc(year, month);
@@ -145,6 +147,25 @@ export async function getLedgerState(
     ],
   });
 
+  // Pull recent payees and dedupe in recency order for lightweight autocomplete.
+  const recentPayees = await prisma.transaction.findMany({
+    where: { userId },
+    orderBy: [{ updatedAt: "desc" }],
+    take: 300,
+    select: { payee: true },
+  });
+  const seen = new Set<string>();
+  const payeeSuggestions: string[] = [];
+  for (const row of recentPayees) {
+    const trimmed = row.payee.trim();
+    if (!trimmed) continue;
+    const key = trimmed.toLocaleLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    payeeSuggestions.push(trimmed);
+    if (payeeSuggestions.length >= 80) break;
+  }
+
   let running = effectiveOpeningDec;
   const transactions: LedgerRow[] = txs.map((t) => {
     running = running.add(t.amount);
@@ -153,6 +174,7 @@ export async function getLedgerState(
       occurredOn: t.occurredOn,
       payee: t.payee,
       amount: t.amount.toFixed(2),
+      status: t.status as LedgerRow["status"],
       sortOrder: t.sortOrder,
       balanceAfter: running.toFixed(2),
     };
@@ -164,5 +186,6 @@ export async function getLedgerState(
     hasStoredOpening: openingRow !== null,
     closing: running.toFixed(2),
     transactions,
+    payeeSuggestions,
   };
 }

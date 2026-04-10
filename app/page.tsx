@@ -11,10 +11,12 @@ export default async function Home() {
   return (
     <div className="mx-auto flex min-h-full max-w-lg flex-col justify-center gap-8 px-6 py-16">
       <div>
-        <h1 className="text-3xl font-semibold tracking-tight text-zinc-900">Budget tracker</h1>
+        <h1 className="text-3xl font-semibold tracking-tight text-zinc-900">
+          Budget tracker
+        </h1>
         <p className="mt-2 text-zinc-600">
-          Sign in to track your primary account balance and future cash position—like your monthly
-          sheet, without the spreadsheet.
+          Sign in to track your primary account balance and future cash
+          position—like your monthly sheet, without the spreadsheet.
         </p>
       </div>
       <div>
@@ -26,10 +28,6 @@ export default async function Home() {
             Continue with Google
           </button>
         </form>
-        <p className="mt-4 text-xs text-zinc-500">
-          Uses Auth.js with Google. Set <code className="rounded bg-zinc-100 px-1">AUTH_SECRET</code>{" "}
-          and Google OAuth credentials in your environment.
-        </p>
       </div>
     </div>
   );

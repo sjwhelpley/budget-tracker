@@ -94,6 +94,83 @@ export async function createTransaction(formData: FormData) {
   revalidatePath("/ledger");
 }
 
+export async function updateTransaction(formData: FormData) {
+  const userId = await requireUserId();
+  const id = String(formData.get("id") ?? "");
+  const year = Number(formData.get("year"));
+  const month = Number(formData.get("month"));
+  const payee = String(formData.get("payee") ?? "").trim();
+  const amountRaw = String(formData.get("amount") ?? "").trim();
+  const dateRaw = String(formData.get("occurredOn") ?? "").trim();
+
+  if (!id) {
+    throw new Error("Missing id");
+  }
+  if (!payee) {
+    throw new Error("Payee is required");
+  }
+  if (!Number.isFinite(year) || !Number.isFinite(month) || month < 1 || month > 12) {
+    throw new Error("Invalid month");
+  }
+
+  const amount = new Prisma.Decimal(amountRaw || "0");
+  const monthStart = monthStartUtc(year, month);
+  const monthEnd = monthEndExclusiveUtc(year, month);
+
+  if (!dateRaw) {
+    throw new Error("Date is required");
+  }
+  const [y, m, d] = dateRaw.split("-").map(Number);
+  const occurredOn = new Date(Date.UTC(y, m - 1, d));
+
+  if (occurredOn < monthStart || occurredOn >= monthEnd) {
+    throw new Error("Date must be within the selected month");
+  }
+
+  const row = await prisma.transaction.findFirst({
+    where: { id, userId },
+    select: { id: true },
+  });
+  if (!row) {
+    throw new Error("Not found");
+  }
+
+  await prisma.transaction.update({
+    where: { id },
+    data: { payee, amount, occurredOn },
+  });
+
+  revalidatePath("/ledger");
+}
+
+export async function setTransactionStatus(formData: FormData) {
+  const userId = await requireUserId();
+  const id = String(formData.get("id") ?? "");
+  const statusRaw = String(formData.get("status") ?? "").trim().toUpperCase();
+
+  if (!id) {
+    throw new Error("Missing id");
+  }
+  if (statusRaw !== "NONE" && statusRaw !== "COMPLETED" && statusRaw !== "ESTIMATED") {
+    throw new Error("Invalid status");
+  }
+
+  const row = await prisma.transaction.findFirst({
+    where: { id, userId },
+    select: { id: true },
+  });
+  if (!row) {
+    throw new Error("Not found");
+  }
+
+  await prisma.transaction.update({
+    where: { id },
+    data: { status: statusRaw as "NONE" | "COMPLETED" | "ESTIMATED" },
+  });
+
+  revalidatePath("/ledger");
+}
+
 export async function deleteTransaction(formData: FormData) {
   const userId = await requireUserId();
   const id = String(formData.get("id") ?? "");

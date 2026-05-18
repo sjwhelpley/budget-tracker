@@ -24,9 +24,9 @@ export function AddTransactionForm({
   const [state, formAction] = useActionState(createTransaction, null);
 
   useEffect(() => {
-    if (state?.error) {
-      showToast(state.error);
-    }
+    if (!state) return;
+    if ("error" in state) showToast(state.error, "error");
+    else showToast("Transaction added!", "success");
   }, [state, showToast]);
 
   return (

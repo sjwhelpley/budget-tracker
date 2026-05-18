@@ -2,8 +2,8 @@
 
 import { createContext, useCallback, useContext, useRef, useState } from "react";
 
-type Toast = { id: number; message: string; type: "error" | "info" };
-type ShowToast = (message: string, type?: "error" | "info") => void;
+type Toast = { id: number; message: string; type: "error" | "success" };
+type ShowToast = (message: string, type?: "error" | "success") => void;
 
 const ToastContext = createContext<ShowToast>(() => {});
 
@@ -31,7 +31,7 @@ export function ToasterProvider({ children }: { children: React.ReactNode }) {
           <div
             key={toast.id}
             className={`pointer-events-auto max-w-xs rounded-lg px-4 py-3 text-sm font-medium text-white shadow-lg ${
-              toast.type === "error" ? "bg-red-600" : "bg-zinc-800"
+              toast.type === "error" ? "bg-red-600" : "bg-emerald-700"
             }`}
           >
             {toast.message}

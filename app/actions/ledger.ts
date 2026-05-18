@@ -6,7 +6,7 @@ import { auth } from "@/auth";
 import { monthEndExclusiveUtc, monthStartUtc } from "@/lib/ledger";
 import { prisma } from "@/lib/prisma";
 
-type ActionResult = { error: string } | null;
+type ActionResult = { error: string } | { success: true } | null;
 
 async function requireUserId(): Promise<string> {
   const session = await auth();
@@ -91,7 +91,7 @@ export async function createTransaction(
     });
 
     revalidatePath("/ledger");
-    return null;
+    return { success: true };
   } catch (e) {
     return catchError(e);
   }
@@ -227,7 +227,7 @@ export async function copyTransactionToNextMonth(formData: FormData): Promise<Ac
     });
 
     revalidatePath("/ledger");
-    return null;
+    return { success: true };
   } catch (e) {
     return catchError(e);
   }

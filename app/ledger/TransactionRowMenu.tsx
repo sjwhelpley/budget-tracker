@@ -104,13 +104,18 @@ export function TransactionRowMenu({
     };
   }, [isMenuOpen]);
 
-  function runAction(action: (fd: FormData) => Promise<{ error: string } | null>, fields: Record<string, string>) {
+  function runAction(
+    action: (fd: FormData) => Promise<{ error: string } | { success: true } | null>,
+    fields: Record<string, string>,
+    successMessage?: string,
+  ) {
     closeMenu();
     startTransition(async () => {
       const fd = new FormData();
       for (const [k, v] of Object.entries(fields)) fd.set(k, v);
       const result = await action(fd);
-      if (result?.error) showToast(result.error);
+      if (result && "error" in result) showToast(result.error, "error");
+      else if (successMessage) showToast(successMessage, "success");
     });
   }
 
@@ -119,8 +124,8 @@ export function TransactionRowMenu({
     const fd = new FormData(e.currentTarget);
     startTransition(async () => {
       const result = await updateTransaction(fd);
-      if (result?.error) {
-        showToast(result.error);
+      if (result && "error" in result) {
+        showToast(result.error, "error");
       } else {
         closeEdit();
       }
@@ -193,7 +198,7 @@ export function TransactionRowMenu({
             <button
               className="w-full rounded-md px-3 py-2 text-left text-sm text-zinc-800 hover:bg-zinc-50"
               disabled={isPending}
-              onClick={() => runAction(copyTransactionToNextMonth, { id })}
+              onClick={() => runAction(copyTransactionToNextMonth, { id }, "Copied to next month!")}
               type="button"
             >
               Copy to next month

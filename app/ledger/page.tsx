@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
-import { createTransaction, setMonthOpening } from "@/app/actions/ledger";
-import { PayeeAutocompleteInput } from "@/app/ledger/PayeeAutocompleteInput";
+import { setMonthOpening } from "@/app/actions/ledger";
+import { AddTransactionForm } from "@/app/ledger/AddTransactionForm";
 import { TransactionRowMenu } from "@/app/ledger/TransactionRowMenu";
 import {
   dateInputBoundsForMonth,
@@ -126,52 +126,13 @@ export default async function LedgerPage({
         <h2 className="mb-3 text-sm font-medium text-zinc-700">
           Add transaction
         </h2>
-        <form
-          action={createTransaction}
-          className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"
-          key={`add-tx-${year}-${month}`}
-        >
-          <input type="hidden" name="year" value={year} />
-          <input type="hidden" name="month" value={month} />
-          <label className="flex flex-col gap-1 text-sm sm:col-span-2">
-            <span className="text-zinc-700">Payee</span>
-            <PayeeAutocompleteInput
-              name="payee"
-              placeholder="Rent, Paycheck, …"
-              required
-              suggestions={state.payeeSuggestions}
-            />
-          </label>
-          <label className="flex flex-col gap-1 text-sm">
-            <span className="text-zinc-700">Amount (+ / −)</span>
-            <input
-              className="rounded-lg border border-zinc-200 bg-white px-3 py-2 font-mono text-sm text-zinc-900 placeholder:text-zinc-400"
-              name="amount"
-              type="text"
-              placeholder="-1830.00"
-              required
-            />
-          </label>
-          <label className="flex flex-col gap-1 text-sm">
-            <span className="text-zinc-700">Date</span>
-            <input
-              className="rounded-lg border border-zinc-200 bg-white px-3 py-2 font-mono text-sm text-zinc-900 [color-scheme:light]"
-              defaultValue={txDateDefault}
-              max={txDateBounds.max}
-              min={txDateBounds.min}
-              name="occurredOn"
-              type="date"
-            />
-          </label>
-          <div className="flex items-end sm:col-span-2 lg:col-span-4">
-            <button
-              className="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-600"
-              type="submit"
-            >
-              Add
-            </button>
-          </div>
-        </form>
+        <AddTransactionForm
+          year={year}
+          month={month}
+          txDateDefault={txDateDefault}
+          txDateBounds={txDateBounds}
+          payeeSuggestions={state.payeeSuggestions}
+        />
       </section>
 
       <section>
@@ -213,20 +174,18 @@ export default async function LedgerPage({
                   return (
                     <tr
                       className={`border-b border-zinc-100 ${
-                        isCompleted
-                          ? "bg-sky-50 hover:bg-sky-100/40"
-                          : "hover:bg-zinc-50/80"
+                        isEstimated
+                          ? "bg-amber-50/60 italic hover:bg-amber-100/50"
+                          : isCompleted
+                            ? "bg-sky-50 hover:bg-sky-100/40"
+                            : "hover:bg-zinc-50/80"
                       }`}
                       key={row.id}
                     >
-                      <td
-                        className={`px-4 py-2 font-mono text-zinc-700 ${isEstimated ? "italic" : ""}`}
-                      >
+                      <td className="px-4 py-2 font-mono text-zinc-700">
                         {dDisplay}
                       </td>
-                      <td
-                        className={`px-4 py-2 text-zinc-900 ${isEstimated ? "italic" : ""}`}
-                      >
+                      <td className="px-4 py-2 text-zinc-900">
                         {row.payee}
                       </td>
                       <td

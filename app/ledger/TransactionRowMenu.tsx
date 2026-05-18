@@ -1,7 +1,13 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
-import { deleteTransaction, setTransactionStatus, updateTransaction } from "@/app/actions/ledger";
+import { useEffect, useId, useRef, useState, useTransition } from "react";
+import {
+  copyTransactionToNextMonth,
+  deleteTransaction,
+  setTransactionStatus,
+  updateTransaction,
+} from "@/app/actions/ledger";
+import { useToast } from "@/app/components/Toaster";
 
 type Props = {
   id: string;
@@ -37,6 +43,9 @@ export function TransactionRowMenu({
   const [draftAmount, setDraftAmount] = useState(amount);
   const [draftDate, setDraftDate] = useState(occurredOnIso);
 
+  const showToast = useToast();
+  const [isPending, startTransition] = useTransition();
+
   function closeMenu() {
     setIsMenuOpen(false);
   }
@@ -45,12 +54,12 @@ export function TransactionRowMenu({
     const trigger = triggerRef.current;
     if (!trigger) return;
     const rect = trigger.getBoundingClientRect();
-    const width = 176;
+    const width = 192;
     const left = Math.min(
       Math.max(8, rect.right - width),
       Math.max(8, window.innerWidth - width - 8),
     );
-    const top = Math.min(rect.bottom + 6, Math.max(8, window.innerHeight - 220));
+    const top = Math.min(rect.bottom + 6, Math.max(8, window.innerHeight - 260));
     setMenuPos({ top, left });
     setIsMenuOpen(true);
   }
@@ -62,12 +71,6 @@ export function TransactionRowMenu({
 
   function closeEdit() {
     dialogRef.current?.close();
-  }
-
-  function closeMenuSoon() {
-    window.setTimeout(() => {
-      closeMenu();
-    }, 0);
   }
 
   useEffect(() => {
@@ -101,6 +104,29 @@ export function TransactionRowMenu({
     };
   }, [isMenuOpen]);
 
+  function runAction(action: (fd: FormData) => Promise<{ error: string } | null>, fields: Record<string, string>) {
+    closeMenu();
+    startTransition(async () => {
+      const fd = new FormData();
+      for (const [k, v] of Object.entries(fields)) fd.set(k, v);
+      const result = await action(fd);
+      if (result?.error) showToast(result.error);
+    });
+  }
+
+  function handleEditSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const fd = new FormData(e.currentTarget);
+    startTransition(async () => {
+      const result = await updateTransaction(fd);
+      if (result?.error) {
+        showToast(result.error);
+      } else {
+        closeEdit();
+      }
+    });
+  }
+
   return (
     <>
       <button
@@ -119,25 +145,25 @@ export function TransactionRowMenu({
           ref={menuRef}
           style={{ left: `${menuPos.left}px`, top: `${menuPos.top}px` }}
         >
-          <div className="w-44 rounded-lg border border-zinc-200 bg-white p-1 shadow-lg">
-          <button
-            className="w-full rounded-md px-3 py-2 text-left text-sm text-zinc-800 hover:bg-zinc-50"
-            onClick={openEdit}
-            type="button"
-          >
-            Edit
-          </button>
+          <div className="w-48 rounded-lg border border-zinc-200 bg-white p-1 shadow-lg">
+            <button
+              className="w-full rounded-md px-3 py-2 text-left text-sm text-zinc-800 hover:bg-zinc-50"
+              onClick={openEdit}
+              type="button"
+            >
+              Edit
+            </button>
 
-          <form action={setTransactionStatus} onSubmit={closeMenuSoon}>
-            <input name="id" type="hidden" value={id} />
-            <input
-              name="status"
-              type="hidden"
-              value={status === "COMPLETED" ? "NONE" : "COMPLETED"}
-            />
             <button
               className="w-full rounded-md px-3 py-2 text-left text-sm hover:bg-zinc-50"
-              type="submit"
+              disabled={isPending}
+              onClick={() =>
+                runAction(setTransactionStatus, {
+                  id,
+                  status: status === "COMPLETED" ? "NONE" : "COMPLETED",
+                })
+              }
+              type="button"
             >
               {status === "COMPLETED" ? (
                 <span className="text-sky-700">Mark completed ✓ (clear)</span>
@@ -145,18 +171,17 @@ export function TransactionRowMenu({
                 <span className="text-zinc-800">Mark completed</span>
               )}
             </button>
-          </form>
 
-          <form action={setTransactionStatus} onSubmit={closeMenuSoon}>
-            <input name="id" type="hidden" value={id} />
-            <input
-              name="status"
-              type="hidden"
-              value={status === "ESTIMATED" ? "NONE" : "ESTIMATED"}
-            />
             <button
               className="w-full rounded-md px-3 py-2 text-left text-sm hover:bg-zinc-50"
-              type="submit"
+              disabled={isPending}
+              onClick={() =>
+                runAction(setTransactionStatus, {
+                  id,
+                  status: status === "ESTIMATED" ? "NONE" : "ESTIMATED",
+                })
+              }
+              type="button"
             >
               {status === "ESTIMATED" ? (
                 <span className="italic text-amber-700">Mark estimated ✓ (clear)</span>
@@ -164,19 +189,26 @@ export function TransactionRowMenu({
                 <span className="text-zinc-800">Mark estimated</span>
               )}
             </button>
-          </form>
 
-          <div className="my-1 border-t border-zinc-100" />
+            <button
+              className="w-full rounded-md px-3 py-2 text-left text-sm text-zinc-800 hover:bg-zinc-50"
+              disabled={isPending}
+              onClick={() => runAction(copyTransactionToNextMonth, { id })}
+              type="button"
+            >
+              Copy to next month
+            </button>
 
-          <form action={deleteTransaction} onSubmit={closeMenuSoon}>
-            <input name="id" type="hidden" value={id} />
+            <div className="my-1 border-t border-zinc-100" />
+
             <button
               className="w-full rounded-md px-3 py-2 text-left text-sm text-red-700 hover:bg-red-50"
-              type="submit"
+              disabled={isPending}
+              onClick={() => runAction(deleteTransaction, { id })}
+              type="button"
             >
               Delete
             </button>
-          </form>
           </div>
         </div>
       ) : null}
@@ -196,7 +228,7 @@ export function TransactionRowMenu({
             </button>
           </div>
 
-          <form action={updateTransaction} className="mt-4 grid gap-3" onSubmit={closeEdit}>
+          <form className="mt-4 grid gap-3" onSubmit={handleEditSubmit}>
             <input name="id" type="hidden" value={id} />
             <input name="year" type="hidden" value={year} />
             <input name="month" type="hidden" value={month} />
@@ -248,10 +280,11 @@ export function TransactionRowMenu({
                 Cancel
               </button>
               <button
-                className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800"
+                className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-60"
+                disabled={isPending}
                 type="submit"
               >
-                Save
+                {isPending ? "Saving…" : "Save"}
               </button>
             </div>
           </form>
@@ -260,4 +293,3 @@ export function TransactionRowMenu({
     </>
   );
 }
-

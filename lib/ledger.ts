@@ -1,6 +1,6 @@
 import { Prisma } from "@/app/generated/prisma/client";
 import {
-  TRANSACTION_CATEGORIES,
+  TRANSACTION_CATEGORIES_IN_TOTALS,
   type TransactionCategoryValue,
 } from "@/lib/categories";
 import { prisma } from "@/lib/prisma";
@@ -142,7 +142,7 @@ async function getCategoryTotalsForMonth(
   for (const row of grouped) {
     totalsByCategory.set(row.category as TransactionCategoryValue, row._sum.amount ?? new Prisma.Decimal(0));
   }
-  return TRANSACTION_CATEGORIES.map((category) => ({
+  return TRANSACTION_CATEGORIES_IN_TOTALS.map((category) => ({
     category,
     total: (totalsByCategory.get(category) ?? new Prisma.Decimal(0)).toFixed(2),
   }));

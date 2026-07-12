@@ -206,6 +206,27 @@ export async function deleteTransaction(formData: FormData): Promise<ActionResul
   }
 }
 
+export async function bulkSetCategory(formData: FormData): Promise<ActionResult> {
+  try {
+    const userId = await requireUserId();
+    const ids = formData.getAll("id").map(String).filter(Boolean);
+    const category = parseCategory(formData.get("category"));
+
+    if (ids.length === 0) return { error: "No transactions selected" };
+
+    const result = await prisma.transaction.updateMany({
+      where: { id: { in: ids }, userId },
+      data: { category },
+    });
+    if (result.count === 0) return { error: "Transactions not found" };
+
+    revalidatePath("/ledger");
+    return { success: true };
+  } catch (e) {
+    return catchError(e);
+  }
+}
+
 export async function copyTransactionToNextMonth(formData: FormData): Promise<ActionResult> {
   try {
     const userId = await requireUserId();

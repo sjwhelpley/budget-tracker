@@ -69,10 +69,12 @@ enum TransactionStatus {
 }
 
 enum TransactionCategory {
+  INCOME
   EXPENSES
   LOANS
   CREDIT_CARDS
   OTHER
+  TRANSFER
 }
 
 /// Opening balance for a calendar month (the value at the top of each “month tab”).

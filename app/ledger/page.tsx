@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { setMonthOpening } from "@/app/actions/ledger";
 import { AddTransactionForm } from "@/app/ledger/AddTransactionForm";
-import { TransactionRowMenu } from "@/app/ledger/TransactionRowMenu";
+import { LedgerTable } from "@/app/ledger/LedgerTable";
 import {
   dateInputBoundsForMonth,
   defaultDateInputValueForMonth,
@@ -11,6 +11,7 @@ import {
   shiftMonth,
   TRANSACTION_CATEGORY_LABELS,
 } from "@/lib/ledger";
+import { money } from "@/lib/format";
 
 function parseMonth(search: { y?: string; m?: string }) {
   const now = new Date();
@@ -21,11 +22,6 @@ function parseMonth(search: { y?: string; m?: string }) {
   }
   return { year: y, month: m };
 }
-
-const money = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-});
 
 export default async function LedgerPage({
   searchParams,
@@ -137,101 +133,13 @@ export default async function LedgerPage({
       </section>
 
       <section>
-        <div className="overflow-x-auto rounded-xl border border-zinc-200 bg-white shadow-sm">
-          <table className="w-full min-w-[640px] border-collapse text-left text-sm">
-            <thead>
-              <tr className="border-b border-zinc-200 bg-zinc-50 text-zinc-600">
-                <th className="px-4 py-3 font-medium">Date</th>
-                <th className="px-4 py-3 font-medium">Payee</th>
-                <th className="px-4 py-3 font-medium">Category</th>
-                <th className="px-4 py-3 text-right font-medium">Amount</th>
-                <th className="px-4 py-3 text-right font-medium">
-                  Balance after
-                </th>
-                <th className="w-24 px-4 py-3" />
-              </tr>
-            </thead>
-            <tbody>
-              {state.transactions.length === 0 ? (
-                <tr>
-                  <td
-                    className="px-4 py-8 text-center text-zinc-500"
-                    colSpan={6}
-                  >
-                    No transactions this month yet.
-                  </td>
-                </tr>
-              ) : (
-                state.transactions.map((row) => {
-                  const amt = Number(row.amount);
-                  const dDisplay = row.occurredOn.toLocaleDateString("en-US", {
-                    month: "2-digit",
-                    day: "2-digit",
-                    year: "numeric",
-                    timeZone: "UTC",
-                  });
-                  const dIso = row.occurredOn.toISOString().slice(0, 10);
-                  const isCompleted = row.status === "COMPLETED";
-                  const isEstimated = row.status === "ESTIMATED";
-                  return (
-                    <tr
-                      className={`border-b border-zinc-100 ${
-                        isEstimated
-                          ? "bg-amber-50/60 hover:bg-amber-100/50"
-                          : isCompleted
-                            ? "bg-sky-50 hover:bg-sky-100/40"
-                            : "hover:bg-zinc-50/80"
-                      }`}
-                      key={row.id}
-                    >
-                      <td className="px-4 py-2 font-mono text-zinc-700">
-                        {dDisplay}
-                      </td>
-                      <td
-                        className={`px-4 py-2 text-zinc-900 ${isEstimated ? "italic" : ""}`}
-                      >
-                        {row.payee}
-                      </td>
-                      <td className="px-4 py-2 text-zinc-700">
-                        {TRANSACTION_CATEGORY_LABELS[row.category]}
-                      </td>
-                      <td
-                        className={`px-4 py-2 text-right font-mono tabular-nums ${isEstimated ? "italic" : ""} ${
-                          amt > 0
-                            ? "text-emerald-700"
-                            : amt < 0
-                              ? "text-red-600"
-                              : "text-zinc-800"
-                        }`}
-                      >
-                        {money.format(amt)}
-                      </td>
-                      <td
-                        className={`px-4 py-2 text-right font-mono tabular-nums text-zinc-800 ${isEstimated ? "italic" : ""}`}
-                      >
-                        {money.format(Number(row.balanceAfter))}
-                      </td>
-                      <td className="px-4 py-2 text-right">
-                        <TransactionRowMenu
-                          amount={row.amount}
-                          category={row.category}
-                          dateMax={txDateBounds.max}
-                          dateMin={txDateBounds.min}
-                          id={row.id}
-                          month={month}
-                          occurredOnIso={dIso}
-                          payee={row.payee}
-                          status={row.status}
-                          year={year}
-                        />
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
+        <LedgerTable
+          dateMax={txDateBounds.max}
+          dateMin={txDateBounds.min}
+          month={month}
+          transactions={state.transactions}
+          year={year}
+        />
         <p className="mt-3 text-sm text-zinc-700">
           Closing balance for {monthLabel}:{" "}
           <span className="font-mono text-base font-semibold text-zinc-950 tabular-nums">

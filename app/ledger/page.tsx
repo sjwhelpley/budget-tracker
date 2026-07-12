@@ -9,6 +9,7 @@ import {
   defaultDateInputValueForMonth,
   getLedgerState,
   shiftMonth,
+  TRANSACTION_CATEGORY_LABELS,
 } from "@/lib/ledger";
 
 function parseMonth(search: { y?: string; m?: string }) {
@@ -142,6 +143,7 @@ export default async function LedgerPage({
               <tr className="border-b border-zinc-200 bg-zinc-50 text-zinc-600">
                 <th className="px-4 py-3 font-medium">Date</th>
                 <th className="px-4 py-3 font-medium">Payee</th>
+                <th className="px-4 py-3 font-medium">Category</th>
                 <th className="px-4 py-3 text-right font-medium">Amount</th>
                 <th className="px-4 py-3 text-right font-medium">
                   Balance after
@@ -154,7 +156,7 @@ export default async function LedgerPage({
                 <tr>
                   <td
                     className="px-4 py-8 text-center text-zinc-500"
-                    colSpan={5}
+                    colSpan={6}
                   >
                     No transactions this month yet.
                   </td>
@@ -175,7 +177,7 @@ export default async function LedgerPage({
                     <tr
                       className={`border-b border-zinc-100 ${
                         isEstimated
-                          ? "bg-amber-50/60 italic hover:bg-amber-100/50"
+                          ? "bg-amber-50/60 hover:bg-amber-100/50"
                           : isCompleted
                             ? "bg-sky-50 hover:bg-sky-100/40"
                             : "hover:bg-zinc-50/80"
@@ -185,11 +187,16 @@ export default async function LedgerPage({
                       <td className="px-4 py-2 font-mono text-zinc-700">
                         {dDisplay}
                       </td>
-                      <td className="px-4 py-2 text-zinc-900">
+                      <td
+                        className={`px-4 py-2 text-zinc-900 ${isEstimated ? "italic" : ""}`}
+                      >
                         {row.payee}
                       </td>
+                      <td className="px-4 py-2 text-zinc-700">
+                        {TRANSACTION_CATEGORY_LABELS[row.category]}
+                      </td>
                       <td
-                        className={`px-4 py-2 text-right font-mono tabular-nums ${
+                        className={`px-4 py-2 text-right font-mono tabular-nums ${isEstimated ? "italic" : ""} ${
                           amt > 0
                             ? "text-emerald-700"
                             : amt < 0
@@ -199,12 +206,15 @@ export default async function LedgerPage({
                       >
                         {money.format(amt)}
                       </td>
-                      <td className="px-4 py-2 text-right font-mono tabular-nums text-zinc-800">
+                      <td
+                        className={`px-4 py-2 text-right font-mono tabular-nums text-zinc-800 ${isEstimated ? "italic" : ""}`}
+                      >
                         {money.format(Number(row.balanceAfter))}
                       </td>
                       <td className="px-4 py-2 text-right">
                         <TransactionRowMenu
                           amount={row.amount}
+                          category={row.category}
                           dateMax={txDateBounds.max}
                           dateMin={txDateBounds.min}
                           id={row.id}
@@ -228,6 +238,32 @@ export default async function LedgerPage({
             {money.format(Number(state.closing))}
           </span>
         </p>
+      </section>
+
+      <section className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
+        <h2 className="mb-3 text-sm font-medium text-zinc-700">
+          Totals by category — {monthLabel}
+        </h2>
+        <table className="w-full max-w-sm border-collapse text-left text-sm">
+          <thead>
+            <tr className="border-b border-zinc-200 text-zinc-600">
+              <th className="py-2 font-medium">Category</th>
+              <th className="py-2 text-right font-medium">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {state.categoryTotals.map(({ category, total }) => (
+              <tr className="border-b border-zinc-100 last:border-0" key={category}>
+                <td className="py-2 text-zinc-800">
+                  {TRANSACTION_CATEGORY_LABELS[category]}
+                </td>
+                <td className="py-2 text-right font-mono tabular-nums text-zinc-900">
+                  {money.format(Number(total))}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </section>
     </div>
   );

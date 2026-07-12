@@ -68,6 +68,13 @@ enum TransactionStatus {
   ESTIMATED
 }
 
+enum TransactionCategory {
+  EXPENSES
+  LOANS
+  CREDIT_CARDS
+  OTHER
+}
+
 /// Opening balance for a calendar month (the value at the top of each “month tab”).
 model MonthOpening {
   id              String   @id @default(cuid())
@@ -94,6 +101,7 @@ model Transaction {
   /// Positive = inflow, negative = outflow (matches your sheet).
   amount     Decimal  @db.Decimal(19, 2)
   status     TransactionStatus @default(NONE)
+  category   TransactionCategory @default(EXPENSES)
   /// Order within the same calendar day (lower = earlier in the list).
   sortOrder  Int      @default(0)
 

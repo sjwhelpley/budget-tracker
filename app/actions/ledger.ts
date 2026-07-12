@@ -3,6 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { Prisma } from "@/app/generated/prisma/client";
 import { auth } from "@/auth";
+import {
+  TRANSACTION_CATEGORIES,
+  type TransactionCategoryValue,
+} from "@/lib/categories";
 import { monthEndExclusiveUtc, monthStartUtc } from "@/lib/ledger";
 import { prisma } from "@/lib/prisma";
 
@@ -20,6 +24,14 @@ async function requireUserId(): Promise<string> {
 function catchError(e: unknown): { error: string } {
   if (e instanceof Error) return { error: e.message };
   return { error: "An unexpected error occurred" };
+}
+
+function parseCategory(raw: FormDataEntryValue | null): TransactionCategoryValue {
+  const value = String(raw ?? "").trim().toUpperCase();
+  if ((TRANSACTION_CATEGORIES as readonly string[]).includes(value)) {
+    return value as TransactionCategoryValue;
+  }
+  throw new Error("Invalid category");
 }
 
 export async function setMonthOpening(formData: FormData): Promise<void> {
@@ -53,6 +65,7 @@ export async function createTransaction(
     const payee = String(formData.get("payee") ?? "").trim();
     const amountRaw = String(formData.get("amount") ?? "").trim();
     const dateRaw = String(formData.get("occurredOn") ?? "").trim();
+    const category = parseCategory(formData.get("category"));
 
     if (!payee) return { error: "Payee is required" };
     if (!Number.isFinite(year) || !Number.isFinite(month) || month < 1 || month > 12) {
@@ -87,7 +100,7 @@ export async function createTransaction(
     const sortOrder = (last?.sortOrder ?? -1) + 1;
 
     await prisma.transaction.create({
-      data: { userId, occurredOn, payee, amount, sortOrder },
+      data: { userId, occurredOn, payee, amount, category, sortOrder },
     });
 
     revalidatePath("/ledger");
@@ -106,6 +119,7 @@ export async function updateTransaction(formData: FormData): Promise<ActionResul
     const payee = String(formData.get("payee") ?? "").trim();
     const amountRaw = String(formData.get("amount") ?? "").trim();
     const dateRaw = String(formData.get("occurredOn") ?? "").trim();
+    const category = parseCategory(formData.get("category"));
 
     if (!id) return { error: "Missing id" };
     if (!payee) return { error: "Payee is required" };
@@ -133,7 +147,7 @@ export async function updateTransaction(formData: FormData): Promise<ActionResul
 
     await prisma.transaction.update({
       where: { id },
-      data: { payee, amount, occurredOn },
+      data: { payee, amount, occurredOn, category },
     });
 
     revalidatePath("/ledger");
@@ -200,7 +214,7 @@ export async function copyTransactionToNextMonth(formData: FormData): Promise<Ac
 
     const tx = await prisma.transaction.findFirst({
       where: { id, userId },
-      select: { payee: true, amount: true, occurredOn: true },
+      select: { payee: true, amount: true, occurredOn: true, category: true },
     });
     if (!tx) return { error: "Transaction not found" };
 
@@ -223,7 +237,14 @@ export async function copyTransactionToNextMonth(formData: FormData): Promise<Ac
     const sortOrder = (last?.sortOrder ?? -1) + 1;
 
     await prisma.transaction.create({
-      data: { userId, occurredOn, payee: tx.payee, amount: tx.amount, sortOrder },
+      data: {
+        userId,
+        occurredOn,
+        payee: tx.payee,
+        amount: tx.amount,
+        category: tx.category,
+        sortOrder,
+      },
     });
 
     revalidatePath("/ledger");

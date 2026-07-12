@@ -8,6 +8,11 @@ import {
   updateTransaction,
 } from "@/app/actions/ledger";
 import { useToast } from "@/app/components/Toaster";
+import {
+  TRANSACTION_CATEGORIES,
+  TRANSACTION_CATEGORY_LABELS,
+  type TransactionCategoryValue,
+} from "@/lib/categories";
 
 type Props = {
   id: string;
@@ -19,6 +24,7 @@ type Props = {
   dateMin: string; // YYYY-MM-DD
   dateMax: string; // YYYY-MM-DD
   status: "NONE" | "COMPLETED" | "ESTIMATED";
+  category: TransactionCategoryValue;
 };
 
 export function TransactionRowMenu({
@@ -31,6 +37,7 @@ export function TransactionRowMenu({
   dateMin,
   dateMax,
   status,
+  category,
 }: Props) {
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
@@ -42,6 +49,7 @@ export function TransactionRowMenu({
   const [draftPayee, setDraftPayee] = useState(payee);
   const [draftAmount, setDraftAmount] = useState(amount);
   const [draftDate, setDraftDate] = useState(occurredOnIso);
+  const [draftCategory, setDraftCategory] = useState<TransactionCategoryValue>(category);
 
   const showToast = useToast();
   const [isPending, startTransition] = useTransition();
@@ -274,6 +282,22 @@ export function TransactionRowMenu({
                 type="date"
                 value={draftDate}
               />
+            </label>
+
+            <label className="flex flex-col gap-1 text-sm">
+              <span className="text-zinc-700">Category</span>
+              <select
+                className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900"
+                name="category"
+                onChange={(e) => setDraftCategory(e.target.value as TransactionCategoryValue)}
+                value={draftCategory}
+              >
+                {TRANSACTION_CATEGORIES.map((c) => (
+                  <option key={c} value={c}>
+                    {TRANSACTION_CATEGORY_LABELS[c]}
+                  </option>
+                ))}
+              </select>
             </label>
 
             <div className="mt-2 flex items-center justify-end gap-2">

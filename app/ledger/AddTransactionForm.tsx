@@ -4,6 +4,7 @@ import { useActionState, useEffect } from "react";
 import { createTransaction } from "@/app/actions/ledger";
 import { useToast } from "@/app/components/Toaster";
 import { PayeeAutocompleteInput } from "@/app/ledger/PayeeAutocompleteInput";
+import { TRANSACTION_CATEGORIES, TRANSACTION_CATEGORY_LABELS } from "@/lib/categories";
 
 type Props = {
   year: number;
@@ -66,6 +67,20 @@ export function AddTransactionForm({
           name="occurredOn"
           type="date"
         />
+      </label>
+      <label className="flex flex-col gap-1 text-sm">
+        <span className="text-zinc-700">Category</span>
+        <select
+          className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900"
+          defaultValue="EXPENSES"
+          name="category"
+        >
+          {TRANSACTION_CATEGORIES.map((category) => (
+            <option key={category} value={category}>
+              {TRANSACTION_CATEGORY_LABELS[category]}
+            </option>
+          ))}
+        </select>
       </label>
       <div className="flex items-end sm:col-span-2 lg:col-span-4">
         <button

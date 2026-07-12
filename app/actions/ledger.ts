@@ -3,6 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { Prisma } from "@/app/generated/prisma/client";
 import { auth } from "@/auth";
+import {
+  TRANSACTION_CATEGORIES,
+  type TransactionCategoryValue,
+} from "@/lib/categories";
 import { monthEndExclusiveUtc, monthStartUtc } from "@/lib/ledger";
 import { prisma } from "@/lib/prisma";
 
@@ -13,6 +17,14 @@ async function requireUserId(): Promise<string> {
     throw new Error("Unauthorized");
   }
   return id;
+}
+
+function parseCategory(raw: FormDataEntryValue | null): TransactionCategoryValue {
+  const value = String(raw ?? "").trim().toUpperCase();
+  if ((TRANSACTION_CATEGORIES as readonly string[]).includes(value)) {
+    return value as TransactionCategoryValue;
+  }
+  throw new Error("Invalid category");
 }
 
 export async function setMonthOpening(formData: FormData) {
@@ -42,6 +54,7 @@ export async function createTransaction(formData: FormData) {
   const payee = String(formData.get("payee") ?? "").trim();
   const amountRaw = String(formData.get("amount") ?? "").trim();
   const dateRaw = String(formData.get("occurredOn") ?? "").trim();
+  const category = parseCategory(formData.get("category"));
 
   if (!payee) {
     throw new Error("Payee is required");
@@ -87,6 +100,7 @@ export async function createTransaction(formData: FormData) {
       occurredOn,
       payee,
       amount,
+      category,
       sortOrder,
     },
   });
@@ -102,6 +116,7 @@ export async function updateTransaction(formData: FormData) {
   const payee = String(formData.get("payee") ?? "").trim();
   const amountRaw = String(formData.get("amount") ?? "").trim();
   const dateRaw = String(formData.get("occurredOn") ?? "").trim();
+  const category = parseCategory(formData.get("category"));
 
   if (!id) {
     throw new Error("Missing id");
@@ -137,7 +152,7 @@ export async function updateTransaction(formData: FormData) {
 
   await prisma.transaction.update({
     where: { id },
-    data: { payee, amount, occurredOn },
+    data: { payee, amount, occurredOn, category },
   });
 
   revalidatePath("/ledger");

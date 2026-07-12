@@ -1,5 +1,12 @@
 import { Prisma } from "@/app/generated/prisma/client";
+import {
+  TRANSACTION_CATEGORIES,
+  type TransactionCategoryValue,
+} from "@/lib/categories";
 import { prisma } from "@/lib/prisma";
+
+export { TRANSACTION_CATEGORIES, TRANSACTION_CATEGORY_LABELS } from "@/lib/categories";
+export type { TransactionCategoryValue } from "@/lib/categories";
 
 export function monthStartUtc(year: number, month: number): Date {
   return new Date(Date.UTC(year, month - 1, 1));
@@ -109,9 +116,37 @@ export type LedgerRow = {
   payee: string;
   amount: string;
   status: "NONE" | "COMPLETED" | "ESTIMATED";
+  category: TransactionCategoryValue;
   sortOrder: number;
   balanceAfter: string;
 };
+
+export type CategoryTotal = {
+  category: TransactionCategoryValue;
+  total: string;
+};
+
+async function getCategoryTotalsForMonth(
+  userId: string,
+  year: number,
+  month: number,
+): Promise<CategoryTotal[]> {
+  const start = monthStartUtc(year, month);
+  const end = monthEndExclusiveUtc(year, month);
+  const grouped = await prisma.transaction.groupBy({
+    by: ["category"],
+    where: { userId, occurredOn: { gte: start, lt: end } },
+    _sum: { amount: true },
+  });
+  const totalsByCategory = new Map<TransactionCategoryValue, Prisma.Decimal>();
+  for (const row of grouped) {
+    totalsByCategory.set(row.category as TransactionCategoryValue, row._sum.amount ?? new Prisma.Decimal(0));
+  }
+  return TRANSACTION_CATEGORIES.map((category) => ({
+    category,
+    total: (totalsByCategory.get(category) ?? new Prisma.Decimal(0)).toFixed(2),
+  }));
+}
 
 export async function getLedgerState(
   userId: string,
@@ -124,6 +159,7 @@ export async function getLedgerState(
   closing: string;
   transactions: LedgerRow[];
   payeeSuggestions: string[];
+  categoryTotals: CategoryTotal[];
 }> {
   const start = monthStartUtc(year, month);
   const end = monthEndExclusiveUtc(year, month);
@@ -175,10 +211,13 @@ export async function getLedgerState(
       payee: t.payee,
       amount: t.amount.toFixed(2),
       status: t.status as LedgerRow["status"],
+      category: t.category as TransactionCategoryValue,
       sortOrder: t.sortOrder,
       balanceAfter: running.toFixed(2),
     };
   });
+
+  const categoryTotals = await getCategoryTotalsForMonth(userId, year, month);
 
   return {
     storedOpening: openingRow?.openingBalance.toFixed(2) ?? null,
@@ -187,5 +226,6 @@ export async function getLedgerState(
     closing: running.toFixed(2),
     transactions,
     payeeSuggestions,
+    categoryTotals,
   };
 }

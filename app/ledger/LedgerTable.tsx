@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
-import { bulkSetCategory } from "@/app/actions/ledger";
+import { bulkCopyToNextMonth, bulkSetCategory } from "@/app/actions/ledger";
 import { useToast } from "@/app/components/Toaster";
 import { TransactionRowMenu } from "@/app/ledger/TransactionRowMenu";
 import {
@@ -25,7 +25,8 @@ export function LedgerTable({ transactions, year, month, dateMin, dateMax }: Pro
   const [bulkCategory, setBulkCategory] = useState<TransactionCategoryValue>("EXPENSES");
   const dialogRef = useRef<HTMLDialogElement | null>(null);
   const showToast = useToast();
-  const [isPending, startTransition] = useTransition();
+  const [isSavingCategory, startCategoryTransition] = useTransition();
+  const [isCopying, startCopyTransition] = useTransition();
 
   function toggle(id: string) {
     setSelected((prev) => {
@@ -47,7 +48,7 @@ export function LedgerTable({ transactions, year, month, dateMin, dateMax }: Pro
 
   function saveBulkCategory() {
     const ids = Array.from(selected);
-    startTransition(async () => {
+    startCategoryTransition(async () => {
       const fd = new FormData();
       for (const id of ids) fd.append("id", id);
       fd.set("category", bulkCategory);
@@ -58,6 +59,21 @@ export function LedgerTable({ transactions, year, month, dateMin, dateMax }: Pro
         showToast(`Updated ${ids.length} transaction${ids.length === 1 ? "" : "s"}`, "success");
         setSelected(new Set());
         closeBulkEdit();
+      }
+    });
+  }
+
+  function copySelectedToNextMonth() {
+    const ids = Array.from(selected);
+    startCopyTransition(async () => {
+      const fd = new FormData();
+      for (const id of ids) fd.append("id", id);
+      const result = await bulkCopyToNextMonth(fd);
+      if (result && "error" in result) {
+        showToast(result.error, "error");
+      } else {
+        showToast(`Copied ${ids.length} transaction${ids.length === 1 ? "" : "s"} to next month`, "success");
+        setSelected(new Set());
       }
     });
   }
@@ -73,6 +89,14 @@ export function LedgerTable({ transactions, year, month, dateMin, dateMax }: Pro
             type="button"
           >
             Edit category
+          </button>
+          <button
+            className="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-sm font-medium text-zinc-800 hover:bg-zinc-50 disabled:opacity-60"
+            disabled={isCopying}
+            onClick={copySelectedToNextMonth}
+            type="button"
+          >
+            {isCopying ? "Copying…" : "Copy to next month"}
           </button>
         </div>
       ) : null}
@@ -221,11 +245,11 @@ export function LedgerTable({ transactions, year, month, dateMin, dateMax }: Pro
               </button>
               <button
                 className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-60"
-                disabled={isPending}
+                disabled={isSavingCategory}
                 onClick={saveBulkCategory}
                 type="button"
               >
-                {isPending ? "Saving…" : "Save"}
+                {isSavingCategory ? "Saving…" : "Save"}
               </button>
             </div>
           </div>

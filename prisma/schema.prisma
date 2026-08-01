@@ -23,6 +23,7 @@ model User {
 
   transactions  Transaction[]
   monthOpenings MonthOpening[]
+  monthBalances MonthBalances[]
 }
 
 model Account {
@@ -85,6 +86,26 @@ model MonthOpening {
   /// First day of the month (date-only; e.g. 2026-03-01).
   month           DateTime @db.Date
   openingBalance  Decimal  @db.Decimal(19, 2)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, month])
+  @@index([userId, month])
+}
+
+/// Savings and Roth IRA balances snapshotted per calendar month. Either field
+/// may be left unset for a month; the app falls back to the nearest earlier
+/// month that has a value, the same way MonthOpening does for the checking
+/// balance.
+model MonthBalances {
+  id             String   @id @default(cuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// First day of the month (date-only; e.g. 2026-03-01).
+  month          DateTime @db.Date
+  savingsBalance Decimal? @db.Decimal(19, 2)
+  rothIraBalance Decimal? @db.Decimal(19, 2)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

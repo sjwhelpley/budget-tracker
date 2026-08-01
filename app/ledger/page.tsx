@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
-import { setMonthOpening } from "@/app/actions/ledger";
+import { setMonthBalances, setMonthOpening } from "@/app/actions/ledger";
 import { AddTransactionForm } from "@/app/ledger/AddTransactionForm";
 import { LedgerTable } from "@/app/ledger/LedgerTable";
 import {
@@ -38,6 +38,9 @@ export default async function LedgerPage({
   const prev = shiftMonth(year, month, -1);
   const next = shiftMonth(year, month, 1);
 
+  const now = new Date();
+  const isCurrentMonth = year === now.getUTCFullYear() && month === now.getUTCMonth() + 1;
+
   const state = await getLedgerState(session.user.id, year, month);
   const txDateDefault = defaultDateInputValueForMonth(year, month);
   const txDateBounds = dateInputBoundsForMonth(year, month);
@@ -72,6 +75,14 @@ export default async function LedgerPage({
           >
             Next →
           </Link>
+          {!isCurrentMonth ? (
+            <Link
+              className="rounded-lg border border-zinc-200 px-3 py-1.5 text-sm text-zinc-700 hover:bg-zinc-50"
+              href="/ledger"
+            >
+              Return to this month
+            </Link>
+          ) : null}
           <Link
             className="rounded-lg px-3 py-1.5 text-sm text-zinc-600 hover:bg-zinc-100"
             href="/api/auth/signout"
@@ -161,7 +172,7 @@ export default async function LedgerPage({
           </thead>
           <tbody>
             {state.categoryTotals.map(({ category, total }) => (
-              <tr className="border-b border-zinc-100 last:border-0" key={category}>
+              <tr className="border-b border-zinc-100" key={category}>
                 <td className="py-2 text-zinc-800">
                   {TRANSACTION_CATEGORY_LABELS[category]}
                 </td>
@@ -170,8 +181,69 @@ export default async function LedgerPage({
                 </td>
               </tr>
             ))}
+            <tr className="border-t-2 border-zinc-300 font-semibold text-zinc-900">
+              <td className="py-2">Total Spending</td>
+              <td className="py-2 text-right font-mono tabular-nums">
+                {money.format(Number(state.negativeCategoriesTotal))}
+              </td>
+            </tr>
           </tbody>
         </table>
+      </section>
+
+      <section className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm">
+        <h2 className="mb-3 text-sm font-medium text-zinc-700">
+          Savings &amp; Roth IRA balances
+        </h2>
+        <form
+          action={setMonthBalances}
+          className="flex flex-wrap items-end gap-3"
+          key={`balances-${year}-${month}`}
+        >
+          <input type="hidden" name="year" value={year} />
+          <input type="hidden" name="month" value={month} />
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="text-zinc-700">Savings balance</span>
+            <input
+              className="rounded-lg border border-zinc-200 bg-white px-3 py-2 font-mono text-sm text-zinc-900 placeholder:text-zinc-400"
+              name="savingsBalance"
+              type="text"
+              defaultValue={state.savingsBalance.effective}
+              placeholder="5000.00"
+              required
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="text-zinc-700">Roth IRA balance</span>
+            <input
+              className="rounded-lg border border-zinc-200 bg-white px-3 py-2 font-mono text-sm text-zinc-900 placeholder:text-zinc-400"
+              name="rothIraBalance"
+              type="text"
+              defaultValue={state.rothIraBalance.effective}
+              placeholder="12000.00"
+              required
+            />
+          </label>
+          <button
+            className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800"
+            type="submit"
+          >
+            Save
+          </button>
+        </form>
+        {!state.savingsBalance.hasStored || !state.rothIraBalance.hasStored ? (
+          <p className="mt-2 text-sm text-amber-800">
+            No saved {[
+              !state.savingsBalance.hasStored ? "savings" : null,
+              !state.rothIraBalance.hasStored ? "Roth IRA" : null,
+            ]
+              .filter(Boolean)
+              .join(" or ")}{" "}
+            balance for this month yet—the field defaults to last
+            month&apos;s. Adjust if needed, then save to store it for this
+            month.
+          </p>
+        ) : null}
       </section>
     </div>
   );

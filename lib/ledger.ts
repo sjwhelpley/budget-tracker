@@ -1,5 +1,6 @@
 import { Prisma } from "@/app/generated/prisma/client";
 import {
+  NEGATIVE_TOTAL_CATEGORIES,
   TRANSACTION_CATEGORIES_IN_TOTALS,
   type TransactionCategoryValue,
 } from "@/lib/categories";
@@ -110,6 +111,73 @@ async function getEffectiveOpeningBalance(
   return getClosingBalanceForMonth(userId, prev.year, prev.month, depth + 1, cache);
 }
 
+type MonthBalanceField = "savingsBalance" | "rothIraBalance";
+
+/**
+ * Effective value of a MonthBalances field for a month: the stored value if
+ * present, otherwise the nearest earlier month's effective value. Unlike the
+ * checking opening balance, there's no ledger to add on top of it here.
+ */
+async function getEffectiveMonthBalance(
+  userId: string,
+  year: number,
+  month: number,
+  field: MonthBalanceField,
+  depth: number,
+  cache: Map<string, Prisma.Decimal>,
+): Promise<Prisma.Decimal> {
+  const key = `${field}-${year}-${month}`;
+  if (cache.has(key)) {
+    return cache.get(key)!;
+  }
+  if (depth > 240) {
+    const zero = new Prisma.Decimal(0);
+    cache.set(key, zero);
+    return zero;
+  }
+
+  const start = monthStartUtc(year, month);
+  const row = await prisma.monthBalances.findUnique({
+    where: { userId_month: { userId, month: start } },
+  });
+  const stored = row?.[field] ?? null;
+  if (stored !== null) {
+    cache.set(key, stored);
+    return stored;
+  }
+
+  const prev = shiftMonth(year, month, -1);
+  const value = await getEffectiveMonthBalance(userId, prev.year, prev.month, field, depth + 1, cache);
+  cache.set(key, value);
+  return value;
+}
+
+export type MonthBalanceInfo = {
+  stored: string | null;
+  effective: string;
+  hasStored: boolean;
+};
+
+async function getMonthBalanceInfo(
+  userId: string,
+  year: number,
+  month: number,
+  field: MonthBalanceField,
+): Promise<MonthBalanceInfo> {
+  const start = monthStartUtc(year, month);
+  const row = await prisma.monthBalances.findUnique({
+    where: { userId_month: { userId, month: start } },
+  });
+  const cache = new Map<string, Prisma.Decimal>();
+  const effective = await getEffectiveMonthBalance(userId, year, month, field, 0, cache);
+  const stored = row?.[field] ?? null;
+  return {
+    stored: stored !== null ? stored.toFixed(2) : null,
+    effective: effective.toFixed(2),
+    hasStored: stored !== null,
+  };
+}
+
 export type LedgerRow = {
   id: string;
   occurredOn: Date;
@@ -130,7 +198,7 @@ async function getCategoryTotalsForMonth(
   userId: string,
   year: number,
   month: number,
-): Promise<CategoryTotal[]> {
+): Promise<{ rows: CategoryTotal[]; negativeTotal: string }> {
   const start = monthStartUtc(year, month);
   const end = monthEndExclusiveUtc(year, month);
   const grouped = await prisma.transaction.groupBy({
@@ -142,10 +210,15 @@ async function getCategoryTotalsForMonth(
   for (const row of grouped) {
     totalsByCategory.set(row.category as TransactionCategoryValue, row._sum.amount ?? new Prisma.Decimal(0));
   }
-  return TRANSACTION_CATEGORIES_IN_TOTALS.map((category) => ({
+  const rows = TRANSACTION_CATEGORIES_IN_TOTALS.map((category) => ({
     category,
     total: (totalsByCategory.get(category) ?? new Prisma.Decimal(0)).toFixed(2),
   }));
+  const negativeTotal = NEGATIVE_TOTAL_CATEGORIES.reduce(
+    (sum, category) => sum.add(totalsByCategory.get(category) ?? new Prisma.Decimal(0)),
+    new Prisma.Decimal(0),
+  ).toFixed(2);
+  return { rows, negativeTotal };
 }
 
 export async function getLedgerState(
@@ -160,6 +233,9 @@ export async function getLedgerState(
   transactions: LedgerRow[];
   payeeSuggestions: string[];
   categoryTotals: CategoryTotal[];
+  negativeCategoriesTotal: string;
+  savingsBalance: MonthBalanceInfo;
+  rothIraBalance: MonthBalanceInfo;
 }> {
   const start = monthStartUtc(year, month);
   const end = monthEndExclusiveUtc(year, month);
@@ -217,7 +293,10 @@ export async function getLedgerState(
     };
   });
 
-  const categoryTotals = await getCategoryTotalsForMonth(userId, year, month);
+  const { rows: categoryTotals, negativeTotal: negativeCategoriesTotal } =
+    await getCategoryTotalsForMonth(userId, year, month);
+  const savingsBalance = await getMonthBalanceInfo(userId, year, month, "savingsBalance");
+  const rothIraBalance = await getMonthBalanceInfo(userId, year, month, "rothIraBalance");
 
   return {
     storedOpening: openingRow?.openingBalance.toFixed(2) ?? null,
@@ -227,5 +306,8 @@ export async function getLedgerState(
     transactions,
     payeeSuggestions,
     categoryTotals,
+    negativeCategoriesTotal,
+    savingsBalance,
+    rothIraBalance,
   };
 }

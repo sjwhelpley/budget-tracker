@@ -54,6 +54,28 @@ export async function setMonthOpening(formData: FormData): Promise<void> {
   revalidatePath("/ledger");
 }
 
+export async function setMonthBalances(formData: FormData): Promise<void> {
+  const userId = await requireUserId();
+  const year = Number(formData.get("year"));
+  const month = Number(formData.get("month"));
+  if (!Number.isFinite(year) || !Number.isFinite(month) || month < 1 || month > 12) {
+    throw new Error("Invalid month");
+  }
+  const savingsRaw = String(formData.get("savingsBalance") ?? "").trim();
+  const rothRaw = String(formData.get("rothIraBalance") ?? "").trim();
+  const savingsBalance = new Prisma.Decimal(savingsRaw || "0");
+  const rothIraBalance = new Prisma.Decimal(rothRaw || "0");
+
+  const start = monthStartUtc(year, month);
+  await prisma.monthBalances.upsert({
+    where: { userId_month: { userId, month: start } },
+    create: { userId, month: start, savingsBalance, rothIraBalance },
+    update: { savingsBalance, rothIraBalance },
+  });
+
+  revalidatePath("/ledger");
+}
+
 export async function createTransaction(
   _prevState: ActionResult,
   formData: FormData,
